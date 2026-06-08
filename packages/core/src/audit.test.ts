@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
@@ -15,53 +15,110 @@ describe("appendAuditLog", () => {
   })
 
   afterEach(async () => {
-    await fs.rm(tmpDir, { recursive: true, force: true })
-    // reset to default (undefined)
     setAuditLogPath("")
+    await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
-  it("writes a valid JSON line to the log file", async () => {
-    const entry: AuditEntry = {
+  // ── JSON correctness ──────────────────────────────────────────────────────
+
+  it("writes a syntactically valid JSON line", async () => {
+    await appendAuditLog({
       timestamp: "2026-06-08T00:00:00.000Z",
       action: "read",
       file_path: "memory/stack.md",
       status: "ok",
-    }
-    await appendAuditLog(entry)
-
+    })
     const raw = await fs.readFile(logPath, "utf-8")
-    const parsed = JSON.parse(raw.trim()) as AuditEntry
-    expect(parsed.action).toBe("read")
-    expect(parsed.file_path).toBe("memory/stack.md")
-    expect(parsed.status).toBe("ok")
+    expect(() => JSON.parse(raw.trim())).not.toThrow()
   })
 
-  it("appends multiple entries as separate lines", async () => {
+  it("round-trips every field correctly", async () => {
+    const entry: AuditEntry = {
+      timestamp: "2026-06-08T10:00:00.000Z",
+      action: "write",
+      file_path: "memory/conventions.md",
+      status: "pii-redacted",
+      detail: "redacted: stripe-live-key",
+    }
+    await appendAuditLog(entry)
+    const raw = await fs.readFile(logPath, "utf-8")
+    const parsed = JSON.parse(raw.trim()) as AuditEntry
+    expect(parsed.timestamp).toBe(entry.timestamp)
+    expect(parsed.action).toBe(entry.action)
+    expect(parsed.file_path).toBe(entry.file_path)
+    expect(parsed.status).toBe(entry.status)
+    expect(parsed.detail).toBe(entry.detail)
+  })
+
+  it("omits the detail field when not provided", async () => {
+    await appendAuditLog({ timestamp: "t", action: "list", file_path: "/", status: "ok" })
+    const raw = await fs.readFile(logPath, "utf-8")
+    const parsed = JSON.parse(raw.trim()) as AuditEntry
+    expect(parsed.detail).toBeUndefined()
+  })
+
+  // ── Append behavior ────────────────────────────────────────────────────────
+
+  it("appends entries as separate newline-terminated lines", async () => {
     await appendAuditLog({ timestamp: "t", action: "read", file_path: "a.md", status: "ok" })
     await appendAuditLog({ timestamp: "t", action: "write", file_path: "b.md", status: "ok" })
+    await appendAuditLog({ timestamp: "t", action: "grep", file_path: "/", status: "ok" })
 
     const raw = await fs.readFile(logPath, "utf-8")
     const lines = raw.trim().split("\n").filter(Boolean)
-    expect(lines).toHaveLength(2)
+    expect(lines).toHaveLength(3)
   })
 
-  it("never throws even when log path is not writable", async () => {
-    setAuditLogPath("/proc/no-permission/edgemem.log")
+  it("preserves insertion order across multiple entries", async () => {
+    const actions = ["read", "write", "append", "grep", "list", "export"] as const
+    for (const action of actions) {
+      await appendAuditLog({ timestamp: "t", action, file_path: "x.md", status: "ok" })
+    }
+    const raw = await fs.readFile(logPath, "utf-8")
+    const parsed = raw
+      .trim()
+      .split("\n")
+      .map((l) => JSON.parse(l) as AuditEntry)
+    expect(parsed.map((e) => e.action)).toEqual(actions)
+  })
+
+  // ── All valid action + status combinations ────────────────────────────────
+
+  it.each([
+    ["read", "ok"],
+    ["read", "cache-hit"],
+    ["read", "error"],
+    ["write", "ok"],
+    ["write", "pii-redacted"],
+    ["write", "error"],
+    ["append", "ok"],
+    ["append", "protected"],
+    ["grep", "ok"],
+    ["list", "ok"],
+    ["export", "ok"],
+  ] as const)("accepts action=%s status=%s", async (action, status) => {
     await expect(
-      appendAuditLog({ timestamp: "t", action: "grep", file_path: "/", status: "error" })
+      appendAuditLog({ timestamp: new Date().toISOString(), action, file_path: "/", status })
     ).resolves.toBeUndefined()
   })
 
-  it("includes optional detail field when provided", async () => {
-    await appendAuditLog({
-      timestamp: "t",
-      action: "write",
-      file_path: "x.md",
-      status: "pii-redacted",
-      detail: "redacted: stripe-live-key",
-    })
-    const raw = await fs.readFile(logPath, "utf-8")
-    const parsed = JSON.parse(raw.trim()) as AuditEntry
-    expect(parsed.detail).toContain("stripe-live-key")
+  // ── Fail-silent guarantee ─────────────────────────────────────────────────
+
+  it("never throws when the log directory is not writable", async () => {
+    setAuditLogPath("/proc/no-permission-here/edgemem.log")
+    await expect(
+      appendAuditLog({ timestamp: "t", action: "read", file_path: "x.md", status: "error" })
+    ).resolves.toBeUndefined()
+  })
+
+  it("creates intermediate log directories automatically", async () => {
+    const deepLog = path.join(tmpDir, "nested", "deep", "edgemem.log")
+    setAuditLogPath(deepLog)
+    await appendAuditLog({ timestamp: "t", action: "read", file_path: "x.md", status: "ok" })
+    const exists = await fs
+      .access(deepLog)
+      .then(() => true)
+      .catch(() => false)
+    expect(exists).toBe(true)
   })
 })
