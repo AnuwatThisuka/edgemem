@@ -41,9 +41,9 @@ Next session, next developer → Claude already knows
 
 | Mode | How | Best for |
 |------|-----|----------|
-| **Phase 1 — File sync** | `edgemem sync` pulls files locally → `@import` in CLAUDE.md | Getting started, simplest setup |
-| **Phase 2 — MCP server** | Claude has 5 live tools to read/write memory during the session | Active development |
-| **Phase 3 — Hook** | Memory is injected automatically at session start, no commands needed | Zero-effort, always-on |
+| **Mode 1 — File sync** | `edgemem sync` pulls files locally → `@import` in CLAUDE.md | Getting started, simplest setup |
+| **Mode 2 — MCP server** | Claude has 5 live tools to read/write memory during the session | Active development |
+| **Mode 3 — Hook** | Memory is injected automatically at session start, no commands needed | Zero-effort, always-on |
 
 All three modes share the same Supermemory container — one source of truth.
 
@@ -86,7 +86,7 @@ Every teammate with the same `SUPERMEMORY_API_KEY` gets the same context immedia
 
 ## Setup modes
 
-### Phase 1 — File sync
+### Mode 1 — File sync
 
 Pull memory down as local files and reference them from CLAUDE.md:
 
@@ -105,7 +105,7 @@ Limitation: requires running `sync` to pick up new memory. Agent cannot write ba
 
 ---
 
-### Phase 2 — MCP server (recommended)
+### Mode 2 — MCP server (recommended)
 
 Claude gets 5 tools for reading and writing memory in real time during every session.
 
@@ -130,12 +130,12 @@ Claude now has `mem_read`, `mem_write`, `mem_append`, `mem_grep`, and `mem_list`
 
 ---
 
-### Phase 3 — Hook (zero effort)
+### Mode 3 — Hook (zero effort)
 
 Memory is injected automatically at session start. No commands, no prompting.
 
 ```bash
-cp -r examples/phase3-hook/.claude .claude
+cp -r examples/mode3-hook/.claude .claude
 export EDGEMEM_CONTAINER=myproject-team
 ```
 
@@ -257,7 +257,7 @@ Every operation is appended to `.claude/memory/edgemem.log` in JSON Lines format
 # Setup
 npx edgemem init [--container <name>] [--api-key-env <name>]
 
-# Phase 1 — pull memory to local files
+# Mode 1 — pull memory to local files
 npx edgemem sync [--output <dir>] [--container <name>]
 
 # Read / write
@@ -269,7 +269,7 @@ npx edgemem append <path> <content> [--container <name>] [--force]
 npx edgemem grep <query> [--path <path>] [--container <name>]
 npx edgemem list [--path <path>] [--container <name>]
 
-# Phase 3 — output memory context for hook injection
+# Mode 3 — output memory context for hook injection
 npx edgemem inject [--container <name>] [--format context|json]
 ```
 
@@ -344,9 +344,9 @@ packages/
   mcp/    @edgemem/mcp  — MCP server (5 tools)
   cli/    edgemem       — CLI (init, sync, read, write, append, grep, list, inject)
 examples/
-  phase1-claudemd/   file sync example
-  phase2-mcp/        .mcp.json + CLAUDE.md instructions
-  phase3-hook/       .claude/settings.json + auto-save hook
+  mode1-claudemd/   file sync example
+  mode2-mcp/        .mcp.json + CLAUDE.md instructions
+  mode3-hook/       .claude/settings.json + auto-save hook
 ```
 
 ### Test coverage

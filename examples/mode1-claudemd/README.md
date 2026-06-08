@@ -1,4 +1,4 @@
-# Phase 1 — CLAUDE.md dynamic memory
+# Mode 1 — CLAUDE.md dynamic memory
 
 Sync memory from Supermemory cloud → local `.claude/memory/` files so CLAUDE.md can `@import` them.
 No MCP, no hooks. Just files that Claude Code reads at session start.

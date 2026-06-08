@@ -1,4 +1,4 @@
-# Phase 2 — MCP Server (real-time memory during session)
+# Mode 2 — MCP Server (real-time memory during session)
 
 Claude Code gets `mem_read`, `mem_write`, `mem_append`, `mem_grep`, `mem_list`
 as native tools. Memory is live during the session — no file sync needed.
@@ -41,8 +41,8 @@ Claude will ask, then save everything to memory automatically.
 "What does the team memory say about our deployment process?"
 ```
 
-## Combining with Phase 1
+## Combining with Mode 1
 
-Phase 2 MCP works alongside Phase 1 file sync. You can use both:
+Mode 2 MCP works alongside Mode 1 file sync. You can use both:
 - MCP for live read/write during sessions
 - `npx edgemem sync` to export memory to local files for CLAUDE.md imports
