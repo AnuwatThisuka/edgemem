@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>edgemem — Team memory for Claude Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a09;
+  --bg2:#111110;
+  --bg3:#181817;
+  --border:#2a2a28;
+  --border2:#333330;
+  --text:#e8e6df;
+  --muted:#888780;
+  --faint:#555552;
+  --accent:#c8f080;
+  --accent2:#a3e050;
+  --warn:#f0c060;
+  --info:#80c8f0;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'IBM Plex Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--mono);
+  font-size:14px;
+  line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none}
+
+/* scrolling ticker */
+.ticker-wrap{overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--bg2);padding:8px 0;white-space:nowrap}
+.ticker{display:inline-block;animation:ticker 30s linear infinite}
+.ticker span{color:var(--muted);font-size:12px;padding:0 2rem}
+.ticker span b{color:var(--accent);font-weight:500}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* nav */
+nav{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1rem 2.5rem;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;background:rgba(10,10,9,.95);
+  backdrop-filter:blur(8px);
+}
+.nav-logo{font-size:13px;font-weight:500;letter-spacing:.05em;display:flex;align-items:center;gap:.5rem}
+.nav-logo .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.nav-links{display:flex;gap:2rem;align-items:center}
+.nav-links a{color:var(--muted);font-size:12px;transition:color .15s}
+.nav-links a:hover{color:var(--text)}
+.nav-cta{
+  font-size:12px;font-family:var(--mono);
+  border:1px solid var(--border2);
+  padding:.35rem 1rem;color:var(--text);cursor:pointer;
+  transition:border-color .15s,color .15s;background:transparent;
+}
+.nav-cta:hover{border-color:var(--accent);color:var(--accent)}
+
+/* section label */
+.sec-label{
+  font-size:11px;color:var(--faint);letter-spacing:.15em;text-transform:uppercase;
+  margin-bottom:2.5rem;display:block
+}
+
+/* main container */
+main{max-width:900px;margin:0 auto;padding:0 2.5rem}
+
+/* hero */
+.hero{
+  padding:5rem 0 4rem;
+  border-bottom:1px solid var(--border);
+}
+.hero-tag{
+  display:inline-flex;align-items:center;gap:.5rem;
+  font-size:11px;color:var(--muted);
+  border:1px solid var(--border);
+  padding:.3rem .75rem;margin-bottom:2.5rem;
+}
+.hero-tag .live{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 2s ease-in-out infinite}
+.hero h1{
+  font-size:clamp(2rem,5vw,3.2rem);
+  font-weight:300;line-height:1.15;
+  letter-spacing:-.02em;
+  margin-bottom:1rem;
+  font-family:var(--sans);
+}
+.hero h1 em{font-style:normal;color:var(--muted)}
+.hero-sub{
+  font-size:14px;color:var(--muted);
+  max-width:520px;line-height:1.8;
+  margin-bottom:2.5rem;
+}
+.hero-sub code{color:var(--text);background:var(--bg3);padding:.1rem .3rem;font-family:var(--mono);font-size:12px}
+.hero-actions{display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:4rem}
+.btn-primary{
+  font-family:var(--mono);font-size:12px;
+  background:var(--accent);color:#0a0a09;
+  border:none;padding:.6rem 1.5rem;cursor:pointer;font-weight:500;
+  transition:background .15s;
+}
+.btn-primary:hover{background:var(--accent2)}
+.btn-ghost{
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  border:1px solid var(--border);background:transparent;
+  padding:.6rem 1.5rem;cursor:pointer;
+  transition:color .15s,border-color .15s;
+}
+.btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+
+/* flow viz */
+.flow{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  padding:2rem;
+  font-size:12px;
+}
+.flow-title{color:var(--faint);font-size:11px;letter-spacing:.1em;margin-bottom:1.5rem}
+.flow-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative}
+.flow-step{padding:1rem;border-right:1px solid var(--border);position:relative}
+.flow-step:last-child{border-right:none}
+.step-num{font-size:10px;color:var(--faint);margin-bottom:.5rem}
+.step-title{font-size:12px;color:var(--text);margin-bottom:.25rem;font-weight:500}
+.step-sub{font-size:11px;color:var(--muted);line-height:1.5}
+.step-badge{
+  display:inline-block;font-size:10px;
+  background:var(--bg3);border:1px solid var(--border);
+  padding:.15rem .5rem;color:var(--accent);margin-top:.5rem;
+}
+.flow-bar{
+  margin-top:1.5rem;padding-top:1.5rem;
+  border-top:1px solid var(--border);
+  font-size:11px;color:var(--muted);display:flex;gap:1rem;flex-wrap:wrap
+}
+.flow-bar b{color:var(--text)}
+
+/* sections */
+section{padding:4.5rem 0;border-bottom:1px solid var(--border)}
+section h2{
+  font-size:1.6rem;font-weight:300;
+  font-family:var(--sans);
+  letter-spacing:-.015em;
+  line-height:1.2;margin-bottom:1rem;max-width:600px
+}
+section h2 em{font-style:normal;color:var(--muted)}
+.section-intro{color:var(--muted);font-size:13px;max-width:560px;line-height:1.8;margin-bottom:3rem}
+
+/* code block */
+.code-block{
+  background:var(--bg2);border:1px solid var(--border);
+  padding:1.5rem;overflow-x:auto;
+  position:relative;
+}
+.code-block .label{
+  font-size:10px;color:var(--faint);letter-spacing:.1em;
+  margin-bottom:1rem;text-transform:uppercase
+}
+.code-block pre{font-family:var(--mono);font-size:12px;line-height:1.75;color:var(--text);white-space:pre}
+.c-green{color:#a3e050}
+.c-blue{color:#80c8f0}
+.c-yellow{color:#f0c060}
+.c-muted{color:#888780}
+.c-red{color:#f08080}
+.c-pink{color:#e0a0c0}
+
+/* diff block */
+.diff{background:var(--bg2);border:1px solid var(--border);padding:1.5rem;overflow-x:auto}
+.diff .label{font-size:10px;color:var(--faint);letter-spacing:.1em;margin-bottom:1rem;text-transform:uppercase}
+.diff pre{font-family:var(--mono);font-size:12px;line-height:1.75}
+.diff .del{color:var(--c-red,#f08080)}
+.diff .add{color:var(--accent)}
+.diff .neu{color:var(--muted)}
+
+/* modes grid */
+.modes{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:2rem}
+.mode-card{
+  background:var(--bg2);
+  padding:1.75rem;
+}
+.mode-num{font-size:10px;color:var(--faint);letter-spacing:.15em;margin-bottom:1rem}
+.mode-name{font-size:14px;font-weight:500;color:var(--text);margin-bottom:.5rem}
+.mode-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:1rem}
+.mode-tag{
+  font-size:10px;letter-spacing:.05em;
+  border:1px solid var(--border2);color:var(--muted);
+  padding:.2rem .5rem;display:inline-block;
+}
+.mode-tag.best{border-color:var(--accent);color:var(--accent)}
+
+/* security table */
+.sec-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:2rem}
+.sec-table th{
+  text-align:left;font-size:10px;color:var(--faint);
+  letter-spacing:.1em;text-transform:uppercase;
+  padding:.5rem 1rem .5rem 0;border-bottom:1px solid var(--border);font-weight:400
+}
+.sec-table td{
+  padding:.6rem 1rem .6rem 0;
+  border-bottom:1px solid var(--border);
+  color:var(--muted);vertical-align:top;line-height:1.5
+}
+.sec-table td:first-child{color:var(--text);font-family:var(--mono);font-size:11px}
+.sec-table td code{color:var(--accent);font-family:var(--mono);font-size:11px}
+
+/* audit entry */
+.audit{
+  background:var(--bg2);border:1px solid var(--border);
+  padding:1.5rem;overflow-x:auto;margin-bottom:2rem
+}
+.audit pre{font-family:var(--mono);font-size:11px;line-height:2;color:var(--muted)}
+.audit .ok{color:var(--accent)}
+.audit .warn{color:var(--warn)}
+.audit .cache{color:var(--info)}
+
+/* team grid */
+.team-flow{
+  background:var(--bg2);border:1px solid var(--border);
+  padding:2rem;margin-bottom:2rem
+}
+.team-cols{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+.team-col-title{font-size:11px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem}
+.team-step{
+  display:flex;gap:.75rem;padding:.75rem 0;
+  border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)
+}
+.team-step:last-child{border-bottom:none;padding-bottom:0}
+.team-step .who{color:var(--text);min-width:80px;font-size:11px}
+.team-step .what{flex:1;line-height:1.5}
+
+/* install block */
+.install-block{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)
+}
+.install-pane{background:var(--bg2);padding:1.75rem}
+.install-pane .label{font-size:10px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem}
+.install-pane pre{font-family:var(--mono);font-size:12px;line-height:1.9;color:var(--text)}
+
+/* pkg table */
+.pkg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+.pkg-cell{background:var(--bg2);padding:1.25rem}
+.pkg-cell .name{font-size:12px;color:var(--text);margin-bottom:.25rem;font-weight:500}
+.pkg-cell .pkg{font-size:11px;color:var(--accent);margin-bottom:.25rem}
+.pkg-cell .count{font-size:11px;color:var(--muted)}
+
+/* cli table */
+.cli-table{width:100%;border-collapse:collapse;font-size:12px}
+.cli-table tr{border-bottom:1px solid var(--border)}
+.cli-table td{padding:.6rem 0;vertical-align:top;color:var(--muted)}
+.cli-table td:first-child{color:var(--accent);font-family:var(--mono);font-size:11px;width:45%;padding-right:1.5rem}
+
+/* footer */
+footer{
+  border-top:1px solid var(--border);
+  padding:3rem 0;
+  margin-top:0;
+}
+.footer-inner{max-width:900px;margin:0 auto;padding:0 2.5rem}
+.footer-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2.5rem}
+.footer-logo{font-size:13px;font-weight:500}
+.footer-tagline{font-size:12px;color:var(--muted);margin-top:.25rem}
+.footer-links{display:grid;grid-template-columns:repeat(2,auto);gap:2.5rem}
+.footer-col-title{font-size:11px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem}
+.footer-col a{display:block;font-size:12px;color:var(--muted);margin-bottom:.4rem;transition:color .15s}
+.footer-col a:hover{color:var(--text)}
+.footer-bottom{
+  padding-top:2rem;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;
+  font-size:11px;color:var(--faint)
+}
+
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* responsive */
+@media(max-width:640px){
+  nav{padding:1rem 1.25rem}
+  .nav-links{display:none}
+  main{padding:0 1.25rem}
+  .hero{padding:3.5rem 0 3rem}
+  .hero h1{font-size:1.8rem}
+  .flow-steps{grid-template-columns:1fr 1fr}
+  .flow-step:nth-child(2){border-right:none}
+  .modes{grid-template-columns:1fr}
+  .install-block{grid-template-columns:1fr}
+  .pkg-grid{grid-template-columns:1fr 1fr}
+  .team-cols{grid-template-columns:1fr}
+  .footer-top{flex-direction:column;gap:2rem}
+}
+</style>
+</head>
+<body>
+
+<div class="ticker-wrap">
+  <div class="ticker">
+    <span>team memory · <b>cloud-synced</b></span>
+    <span>no more re-explaining · <b>every session</b></span>
+    <span>agent writes back · <b>zero commits</b></span>
+    <span>pii redaction · <b>built-in</b></span>
+    <span>offline resilience · <b>local cache</b></span>
+    <span>167 tests · <b>passing</b></span>
+    <span>MIT licensed · <b>open source</b></span>
+    <span>team memory · <b>cloud-synced</b></span>
+    <span>no more re-explaining · <b>every session</b></span>
+    <span>agent writes back · <b>zero commits</b></span>
+    <span>pii redaction · <b>built-in</b></span>
+    <span>offline resilience · <b>local cache</b></span>
+    <span>167 tests · <b>passing</b></span>
+    <span>MIT licensed · <b>open source</b></span>
+  </div>
+</div>
+
+<nav>
+  <div class="nav-logo">
+    <span class="dot"></span>
+    EDGEMEM · <span style="color:var(--muted);font-weight:300">MEMORY</span>
+  </div>
+  <div class="nav-links">
+    <a href="#how-it-works">How it works</a>
+    <a href="#modes">Modes</a>
+    <a href="#security">Security</a>
+    <a href="#team">Teams</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com" style="color:var(--faint)">GitHub ↗</a>
+  </div>
+  <button class="nav-cta">npm install -g edgemem →</button>
+</nav>
+
+<main>
+
+<!-- HERO -->
+<section class="hero" style="border-bottom:1px solid var(--border)">
+  <div class="hero-tag">
+    <span class="live"></span>
+    EDGEMEM · cloud memory · supermemory · MIT
+  </div>
+  <h1>Team memory for<br/><em>Claude Code.</em></h1>
+  <p class="hero-sub">
+    Claude Code forgets everything when a session ends. edgemem stores your conventions,
+    decisions, and context in the cloud — so every agent session starts
+    with full project knowledge. No more repeating yourself.
+    No <code>--force</code> commits required.
+  </p>
+  <div class="hero-actions">
+    <button class="btn-primary">Self-host in minutes →</button>
+    <button class="btn-ghost">GitHub ↗</button>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">MEMORY · FLOW</div>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="step-num">01</div>
+        <div class="step-title">You write it once</div>
+        <div class="step-sub">conventions, stack, decisions, onboarding</div>
+        <div class="step-badge">edgemem write</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">02</div>
+        <div class="step-title">Cloud stores it</div>
+        <div class="step-sub">Supermemory container · shared by team</div>
+        <div class="step-badge">supermemory.ai</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">03</div>
+        <div class="step-title">Agent reads it</div>
+        <div class="step-sub">MCP tools · hook injection · file sync</div>
+        <div class="step-badge" style="border-color:var(--accent);color:var(--accent)">mem_read</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">04</div>
+        <div class="step-title">Agent writes back</div>
+        <div class="step-sub">auto-saves new conventions discovered</div>
+        <div class="step-badge">mem_append</div>
+      </div>
+    </div>
+    <div class="flow-bar">
+      <span>next session</span>
+      <span>→</span>
+      <span><b>next developer</b></span>
+      <span>→</span>
+      <span>Claude already knows</span>
+      <span style="margin-left:auto;color:var(--accent)">zero commits · zero re-explaining</span>
+    </div>
+  </div>
+</section>
+
+<!-- §01 HOW IT WORKS -->
+<section id="how-it-works">
+  <span class="sec-label">§ 01 · How it works</span>
+  <h2>Context that <em>outlives the session.</em></h2>
+  <p class="section-intro">
+    edgemem is a thin layer between your team and Claude Code.
+    Memory lives in Supermemory cloud. Developers share the same container.
+    The agent reads and writes it live — no commits, no copy-pasting.
+  </p>
+
+  <div class="code-block" style="margin-bottom:1.5rem">
+    <div class="label">QUICK START · bash</div>
+    <pre><span class="c-muted"># 1. install</span>
+<span class="c-green">npm</span> install -g edgemem
+
+<span class="c-muted"># 2. configure</span>
+<span class="c-yellow">export</span> SUPERMEMORY_API_KEY=sm-...
+<span class="c-yellow">export</span> EDGEMEM_CONTAINER=myproject-team
+
+<span class="c-muted"># 3. write your first memory</span>
+<span class="c-green">npx</span> edgemem write <span class="c-blue">"memory/stack.md"</span> <span class="c-blue">"
+Database: PostgreSQL 16
+ORM: Drizzle (not Prisma)
+Package manager: pnpm
+Framework: Next.js App Router
+"</span>
+
+<span class="c-muted"># 4. start Claude — it already knows</span>
+<span class="c-green">npx</span> edgemem sync
+<span class="c-green">claude</span></pre>
+  </div>
+
+  <p style="font-size:12px;color:var(--muted);line-height:1.8">
+    Every teammate with the same <span style="color:var(--text)">SUPERMEMORY_API_KEY</span> gets the same context immediately.
+    No git push. No Slack message. No onboarding doc that goes stale.
+  </p>
+</section>
+
+<!-- §02 MODES -->
+<section id="modes">
+  <span class="sec-label">§ 02 · Delivery modes</span>
+  <h2>Three ways to give<br/><em>Claude the context.</em></h2>
+  <p class="section-intro">
+    All three modes share the same Supermemory container — one source of truth.
+    Mix and match, or pick one and commit.
+  </p>
+
+  <div class="modes">
+    <div class="mode-card">
+      <div class="mode-num">MODE 01</div>
+      <div class="mode-name">File sync</div>
+      <div class="mode-desc">
+        <code style="font-size:11px;color:var(--accent)">edgemem sync</code> pulls files locally.
+        Reference them via <code style="font-size:11px;color:var(--text)">@import</code> in CLAUDE.md.
+        Simplest setup to get started.
+      </div>
+      <span class="mode-tag">getting started</span>
+    </div>
+    <div class="mode-card">
+      <div class="mode-num">MODE 02</div>
+      <div class="mode-name">MCP server</div>
+      <div class="mode-desc">
+        Claude gets 5 live tools: <code style="font-size:11px;color:var(--accent)">mem_read</code>,
+        <code style="font-size:11px;color:var(--accent)">mem_write</code>,
+        <code style="font-size:11px;color:var(--accent)">mem_grep</code> and more.
+        Reads and writes during the session.
+      </div>
+      <span class="mode-tag best">recommended</span>
+    </div>
+    <div class="mode-card">
+      <div class="mode-num">MODE 03</div>
+      <div class="mode-name">Hook injection</div>
+      <div class="mode-desc">
+        Memory injected automatically at session start.
+        No commands. No prompting. Always-on, zero effort.
+      </div>
+      <span class="mode-tag">zero effort</span>
+    </div>
+  </div>
+
+  <div class="code-block">
+    <div class="label">MODE 02 · .mcp.json</div>
+    <pre><span class="c-muted">{</span>
+  <span class="c-blue">"mcpServers"</span>: <span class="c-muted">{</span>
+    <span class="c-blue">"edgemem"</span>: <span class="c-muted">{</span>
+      <span class="c-blue">"command"</span>: <span class="c-green">"npx"</span>,
+      <span class="c-blue">"args"</span>: <span class="c-muted">[</span><span class="c-green">"@edgemem/mcp"</span><span class="c-muted">]</span>,
+      <span class="c-blue">"env"</span>: <span class="c-muted">{</span>
+        <span class="c-blue">"SUPERMEMORY_API_KEY"</span>: <span class="c-yellow">"${SUPERMEMORY_API_KEY}"</span>,
+        <span class="c-blue">"EDGEMEM_CONTAINER"</span>: <span class="c-green">"myproject-team"</span>
+      <span class="c-muted">}</span>
+    <span class="c-muted">}</span>
+  <span class="c-muted">}</span>
+<span class="c-muted">}</span></pre>
+  </div>
+</section>
+
+<!-- §03 SECURITY -->
+<section id="security">
+  <span class="sec-label">§ 03 · Security</span>
+  <h2>Protected core. <em>Redacted secrets.<br/>Signed writes.</em></h2>
+  <p class="section-intro">
+    Core files are read-only for the agent. Every write is scanned for credentials.
+    Every entry is stamped with author and timestamp.
+  </p>
+
+  <div style="margin-bottom:2.5rem">
+    <p style="font-size:11px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem">PROTECTED FILES · read-only for agent</p>
+    <table class="sec-table">
+      <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>memory/stack.md</td><td>Tech stack and versions</td></tr>
+        <tr><td>memory/conventions.md</td><td>Coding conventions and patterns</td></tr>
+        <tr><td>memory/decisions.md</td><td>Architecture decisions and rationale</td></tr>
+        <tr><td>memory/onboarding.md</td><td>New developer guide</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="margin-bottom:2.5rem">
+    <p style="font-size:11px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem">PII SCANNER · redacted before cloud</p>
+    <table class="sec-table">
+      <thead><tr><th>Pattern</th><th>Redacted as</th></tr></thead>
+      <tbody>
+        <tr><td><code>sk_live_*</code>, <code>sk_test_*</code></td><td>[REDACTED_SECRET]</td></tr>
+        <tr><td><code>AKIA*</code></td><td>[REDACTED_SECRET]</td></tr>
+        <tr><td><code>ghp_*</code>, <code>gho_*</code>, <code>ghs_*</code></td><td>[REDACTED_SECRET]</td></tr>
+        <tr><td><code>Bearer &lt;token&gt;</code></td><td>[REDACTED_SECRET]</td></tr>
+        <tr><td><code>password: &lt;value&gt;</code></td><td>[REDACTED_SECRET]</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code-block">
+    <div class="label">WRITE SIGNATURE · every entry</div>
+    <pre><span class="c-muted">&lt;!-- edgemem-entry-start | author: alice | timestamp: 2026-06-08T10:33:10Z --&gt;</span>
+<span class="c-green">Use Drizzle ORM. Run migrations with pnpm db:migrate.</span>
+<span class="c-muted">&lt;!-- edgemem-entry-end --&gt;</span></pre>
+  </div>
+</section>
+
+<!-- §04 TEAM -->
+<section id="team">
+  <span class="sec-label">§ 04 · Built for teams</span>
+  <h2>One write. <em>Every developer.<br/>Every session.</em></h2>
+  <p class="section-intro">
+    All developers share the same container. One person writes a convention —
+    everyone's agent knows immediately. No sync. No commit. No Slack.
+  </p>
+
+  <div class="team-flow">
+    <div class="team-cols">
+      <div>
+        <div class="team-col-title">WRITE ONCE · share forever</div>
+        <div class="team-step">
+          <span class="who">Dev A · Mon</span>
+          <span class="what"><code style="color:var(--accent);font-size:11px">npx edgemem append</code> "Use server actions for all mutations"</span>
+        </div>
+        <div class="team-step">
+          <span class="who">Dev B · Tue</span>
+          <span class="what">Starts Claude — already knows about server actions. No sync. No commit.</span>
+        </div>
+        <div class="team-step">
+          <span class="who">Dev C · Wed</span>
+          <span class="what">Agent discovers a new pattern, writes it back automatically.</span>
+        </div>
+        <div class="team-step">
+          <span class="who">All · Thu</span>
+          <span class="what">New pattern available in every session, every machine.</span>
+        </div>
+      </div>
+      <div>
+        <div class="team-col-title">ONBOARD IN MINUTES</div>
+        <div class="code-block" style="border:none;background:var(--bg3);padding:1.25rem">
+          <pre style="font-size:11px"><span class="c-muted"># new hire, day one</span>
+<span class="c-green">git</span> clone your-repo
+<span class="c-yellow">export</span> SUPERMEMORY_API_KEY=sm-...
+<span class="c-muted"># ^ from team 1Password</span>
+<span class="c-green">claude</span>
+
+<span class="c-muted"># Claude knows:</span>
+<span class="c-green">✓</span> entire tech stack
+<span class="c-green">✓</span> coding conventions
+<span class="c-green">✓</span> past architecture decisions
+<span class="c-green">✓</span> onboarding guide</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §05 OFFLINE -->
+<section>
+  <span class="sec-label">§ 05 · Offline resilience</span>
+  <h2>If Supermemory is unreachable,<br/><em>Claude Code never crashes.</em></h2>
+  <p class="section-intro">
+    edgemem falls back to local cache transparently.
+    Cache lives at <code style="color:var(--text);font-size:12px">~/.edgemem/cache/&lt;container&gt;/</code>.
+  </p>
+
+  <table class="sec-table">
+    <thead><tr><th>Operation</th><th>Offline behavior</th></tr></thead>
+    <tbody>
+      <tr><td><code>read</code></td><td>Returns latest cached version + warns to stderr</td></tr>
+      <tr><td><code>write</code> / <code>append</code></td><td>Writes to local cache + warns to stderr, syncs when online</td></tr>
+      <tr><td><code>grep</code></td><td>Returns empty string + warns to stderr</td></tr>
+      <tr><td><code>list</code></td><td>Returns empty array</td></tr>
+    </tbody>
+  </table>
+
+  <div class="audit">
+    <div class="label" style="font-size:10px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem">AUDIT LOG · .claude/memory/edgemem.log</div>
+    <pre><span class="ok">{"timestamp":"2026-06-08T10:33:10Z","action":"read","file_path":"memory/stack.md","status":"ok","author":"alice"}</span>
+<span class="warn">{"timestamp":"2026-06-08T10:33:11Z","action":"write","file_path":"memory/auto-saved.md","status":"pii-redacted","detail":"redacted: stripe-live-key","author":"ci-bot"}</span>
+<span class="cache">{"timestamp":"2026-06-08T10:33:12Z","action":"read","file_path":"memory/stack.md","status":"cache-hit","author":"bob"}</span></pre>
+  </div>
+</section>
+
+<!-- §06 SMART SEARCH -->
+<section>
+  <span class="sec-label">§ 06 · Smart context chunking</span>
+  <h2>Semantic search that <em>never floods<br/>the context window.</em></h2>
+  <p class="section-intro">
+    <code style="color:var(--text)">mem_grep</code> runs semantic search then returns only the relevant sections.
+    A large memory file never fills Claude's context.
+  </p>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:2rem">
+    <div style="background:var(--bg2);padding:1.25rem">
+      <div style="font-size:10px;color:var(--faint);letter-spacing:.1em;margin-bottom:.5rem">STEP 01</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:.25rem">Split</div>
+      <div style="font-size:11px;color:var(--muted)">Document split into sections by heading or paragraph</div>
+    </div>
+    <div style="background:var(--bg2);padding:1.25rem">
+      <div style="font-size:10px;color:var(--faint);letter-spacing:.1em;margin-bottom:.5rem">STEP 02</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:.25rem">Score</div>
+      <div style="font-size:11px;color:var(--muted)">Each section scored by query relevance. Heading match = 3×</div>
+    </div>
+    <div style="background:var(--bg2);padding:1.25rem">
+      <div style="font-size:10px;color:var(--faint);letter-spacing:.1em;margin-bottom:.5rem">STEP 03</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:.25rem">Budget</div>
+      <div style="font-size:11px;color:var(--muted)">Top sections returned within a 4,000-token budget</div>
+    </div>
+    <div style="background:var(--bg2);padding:1.25rem">
+      <div style="font-size:10px;color:var(--faint);letter-spacing:.1em;margin-bottom:.5rem">STEP 04</div>
+      <div style="font-size:12px;color:var(--text);margin-bottom:.25rem">Warn</div>
+      <div style="font-size:11px;color:var(--muted)">Warning prepended when sections are dropped from output</div>
+    </div>
+  </div>
+</section>
+
+<!-- §07 INSTALL -->
+<section id="install">
+  <span class="sec-label">§ 07 · Install</span>
+  <h2>Up in minutes. <em>Two commands.</em></h2>
+  <p class="section-intro">
+    The whole stack is public — read the source, send a patch.
+    MIT licensed, built in the open.
+  </p>
+
+  <div class="install-block" style="margin-bottom:2rem">
+    <div class="install-pane">
+      <div class="label">INSTALL · bash</div>
+      <pre><span class="c-green">npm</span> install -g edgemem
+
+<span class="c-yellow">export</span> SUPERMEMORY_API_KEY=sm-...
+<span class="c-yellow">export</span> EDGEMEM_CONTAINER=myproject-team
+
+<span class="c-green">npx</span> edgemem init
+<span class="c-green">npx</span> edgemem sync
+<span class="c-green">claude</span></pre>
+    </div>
+    <div class="install-pane">
+      <div class="label">TERMINAL · live</div>
+      <pre><span class="c-muted">~/projects/acme · edgemem live</span>
+
+<span class="c-green">$</span> npx edgemem sync
+<span class="c-muted">▸ container   myproject-team</span>
+<span class="c-muted">▸ pulled      memory/stack.md</span>
+<span class="c-muted">▸ pulled      memory/conventions.md</span>
+<span class="c-muted">▸ pulled      memory/decisions.md</span>
+
+<span class="c-green">$</span> claude
+<span class="c-muted">→ session start · loading context</span>
+<span class="c-green">✓</span> stack.md     · injected
+<span class="c-green">✓</span> conventions  · injected
+<span class="c-green">✓</span> decisions    · injected</pre>
+    </div>
+  </div>
+
+  <div class="pkg-grid" style="margin-bottom:2rem">
+    <div class="pkg-cell">
+      <div class="name">Core</div>
+      <div class="pkg">@edgemem/core</div>
+      <div class="count">107 tests · MemClient, guard, cache, audit, chunker</div>
+    </div>
+    <div class="pkg-cell">
+      <div class="name">MCP Server</div>
+      <div class="pkg">@edgemem/mcp</div>
+      <div class="count">30 tests · 5 tools · mem_read, mem_write, mem_grep…</div>
+    </div>
+    <div class="pkg-cell">
+      <div class="name">CLI</div>
+      <div class="pkg">edgemem</div>
+      <div class="count">30 tests · init, sync, read, write, grep, inject…</div>
+    </div>
+  </div>
+
+  <div style="background:var(--bg2);border:1px solid var(--border);padding:1.5rem">
+    <div style="font-size:11px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1rem">CLI REFERENCE</div>
+    <table class="cli-table">
+      <tr><td>npx edgemem init</td><td>Initialize container and API key config</td></tr>
+      <tr><td>npx edgemem sync</td><td>Pull memory to local files</td></tr>
+      <tr><td>npx edgemem write &lt;path&gt; &lt;content&gt;</td><td>Write or overwrite a memory file</td></tr>
+      <tr><td>npx edgemem append &lt;path&gt; &lt;content&gt;</td><td>Append to a memory file</td></tr>
+      <tr><td>npx edgemem grep &lt;query&gt;</td><td>Semantic search across memory</td></tr>
+      <tr><td>npx edgemem inject</td><td>Output memory context for hook injection</td></tr>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div>
+        <div class="footer-logo">EDGEMEM · <span style="color:var(--muted);font-weight:300">MEMORY</span></div>
+        <div class="footer-tagline">Team memory for Claude Code.</div>
+        <div style="margin-top:.5rem;font-size:11px;color:var(--faint)">Supermemory cloud · MIT · built in the open.</div>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <div class="footer-col-title">Modes</div>
+          <a href="#modes">File sync</a>
+          <a href="#modes">MCP server</a>
+          <a href="#modes">Hook injection</a>
+        </div>
+        <div class="footer-col">
+          <div class="footer-col-title">Docs</div>
+          <a href="#">Getting started</a>
+          <a href="#">Memory conventions</a>
+          <a href="https://github.com">GitHub ↗</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>MIT · 2026 · no more re-explaining yourself.</span>
+      <span>edgemem/edgemem</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
