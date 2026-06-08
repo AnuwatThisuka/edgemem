@@ -1,4 +1,4 @@
-# Phase 3 — Hook (auto-load memory every session)
+# Mode 3 — Hook (auto-load memory every session)
 
 Memory loads automatically at the start of every Claude Code session.
 No commands, no prompting. Memory is always there.
@@ -39,16 +39,16 @@ Example — if Claude outputs:
 
 That line is automatically appended to `memory/auto-saved.md`.
 
-## Combining all three phases
+## Combining all three modes
 
-For the best experience, use all phases together:
+For the best experience, use all modes together:
 
 ```bash
-# .mcp.json → Phase 2 (live read/write tools)
-# .claude/settings.json → Phase 3 (auto-inject hooks)
-# npx edgemem sync → Phase 1 (export to CLAUDE.md files)
+# .mcp.json → Mode 2 (live read/write tools)
+# .claude/settings.json → Mode 3 (auto-inject hooks)
+# npx edgemem sync → Mode 1 (export to CLAUDE.md files)
 ```
 
 Memory written via MCP tools is available to the inject hook in the next session.
-Memory synced via Phase 1 is available for CLAUDE.md imports.
+Memory synced via Mode 1 is available for CLAUDE.md imports.
 All three share the same Supermemory container — one source of truth.
