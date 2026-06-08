@@ -1,6 +1,6 @@
 # edgemem
 
-ระบบ memory สำหรับ Claude Code ที่เก็บ context ของทีมไว้ใน cloud — Claude จะ "จำ" conventions, decisions, และ context ของโปรเจกต์ในทุก session โดยอัตโนมัติ
+Team memory for Claude Code — store your conventions, decisions, and context in the cloud so every agent session starts with full project knowledge. No more repeating yourself.
 
 [![npm](https://img.shields.io/npm/v/edgemem)](https://www.npmjs.com/package/edgemem)
 [![tests](https://img.shields.io/badge/tests-167%20passing-brightgreen)](#)
@@ -8,49 +8,50 @@
 
 ---
 
-## ปัญหาที่แก้
+## The problem
 
-Claude Code ลืมทุกอย่างเมื่อ session จบ ทุกเช้านักพัฒนาต้องบอก Claude ซ้ำๆ ว่า:
+Claude Code forgets everything when a session ends. Every day, every developer re-explains the same things:
 
-- โปรเจกต์นี้ใช้ ORM อะไร
-- Pattern ไหนที่ห้ามใช้
-- Decision ที่ทำไว้เมื่ออาทิตย์ที่แล้วคืออะไร
+- Which ORM the project uses
+- Which patterns are required
+- Which architectural decisions were made and why
+- What a new dev needs to know on day one
 
-`CLAUDE.md` ช่วยได้บางส่วน แต่ต้อง commit ทุกครั้งที่แก้, agent เขียนเองไม่ได้, และถ้าใส่มากเกินจะกิน context window หมด
+`CLAUDE.md` helps — but it requires a commit to update, the agent can't write to it, and it grows until it fills the context window.
 
-**edgemem แก้ปัญหานี้** — เก็บ memory ไว้ใน [Supermemory](https://supermemory.ai) cloud ทุกคนในทีมใช้ร่วมกัน agent อ่านและเขียนได้เอง
-
----
-
-## ภาพรวม
-
-```
-นักพัฒนาเขียน convention ครั้งเดียว
-           ↓
-   เก็บใน Supermemory cloud
-           ↓
-ทุก Claude Code session → edgemem โหลด memory มาให้อัตโนมัติ
-           ↓
-Agent เรียนรู้อะไรใหม่ → บันทึกกลับไปที่ cloud
-           ↓
-session ถัดไป, นักพัฒนาคนอื่น → Claude รู้แล้ว
-```
-
-**3 วิธีที่ Claude รับ memory:**
-
-| วิธี | ทำงานอย่างไร | เหมาะกับ |
-|------|-------------|----------|
-| **Phase 1 — File sync** | `edgemem sync` ดึงไฟล์มาเก็บ local → `@import` ใน CLAUDE.md | เริ่มต้น, ง่ายที่สุด |
-| **Phase 2 — MCP server** | Claude มี 5 tools สำหรับอ่าน/เขียน memory ตลอด session | พัฒนา active |
-| **Phase 3 — Hook** | inject memory อัตโนมัติตอน session เริ่ม ไม่ต้องทำอะไรเพิ่ม | zero-effort |
-
-ทั้ง 3 วิธีใช้ Supermemory container เดียวกัน — ข้อมูลเป็น single source of truth
+**edgemem fixes this.** Memory lives in [Supermemory](https://supermemory.ai) cloud. Every developer shares it. The agent can read and write it. No commits required.
 
 ---
 
-## Quick Start
+## How it works
 
-### 1. ติดตั้งและ setup
+```
+You write a convention once
+         ↓
+Stored in Supermemory cloud
+         ↓
+Every Claude Code session → edgemem loads what's relevant automatically
+         ↓
+Agent learns something new → writes it back to the cloud
+         ↓
+Next session, next developer → Claude already knows
+```
+
+**3 ways Claude receives memory:**
+
+| Mode | How | Best for |
+|------|-----|----------|
+| **Phase 1 — File sync** | `edgemem sync` pulls files locally → `@import` in CLAUDE.md | Getting started, simplest setup |
+| **Phase 2 — MCP server** | Claude has 5 live tools to read/write memory during the session | Active development |
+| **Phase 3 — Hook** | Memory is injected automatically at session start, no commands needed | Zero-effort, always-on |
+
+All three modes share the same Supermemory container — one source of truth.
+
+---
+
+## Quick start
+
+### 1. Install and initialize
 
 ```bash
 npm install -g edgemem
@@ -61,7 +62,7 @@ export EDGEMEM_CONTAINER=myproject-team
 npx edgemem init
 ```
 
-### 2. เขียน memory แรก
+### 2. Write your first memory
 
 ```bash
 npx edgemem write "memory/stack.md" "
@@ -72,43 +73,43 @@ Framework: Next.js App Router
 "
 ```
 
-### 3. ดึง memory มาใช้กับ Claude
+### 3. Load memory into Claude
 
 ```bash
-npx edgemem sync   # ดึงไฟล์มาเก็บที่ .claude/memory/
-claude             # Claude อ่าน memory ผ่าน CLAUDE.md อัตโนมัติ
+npx edgemem sync   # pull memory → .claude/memory/
+claude             # Claude reads it automatically via CLAUDE.md
 ```
 
-ทีมทุกคนที่ตั้ง `SUPERMEMORY_API_KEY` เดียวกัน จะได้ context เดียวกันทันที
+Every teammate with the same `SUPERMEMORY_API_KEY` gets the same context immediately.
 
 ---
 
-## การ setup แบบต่างๆ
+## Setup modes
 
-### Phase 1 — File sync (ง่ายที่สุด)
+### Phase 1 — File sync
 
-ดึง memory มาเป็น local files แล้วให้ CLAUDE.md อ้างถึง:
+Pull memory down as local files and reference them from CLAUDE.md:
 
 ```bash
 npx edgemem sync --output .claude/memory
 ```
 
-เพิ่มใน `CLAUDE.md`:
+Add to `CLAUDE.md`:
 
 ```markdown
 @.claude/memory/stack.md
 @.claude/memory/conventions.md
 ```
 
-ข้อจำกัด: ต้อง run `sync` ทุกครั้งที่ต้องการ memory ใหม่, agent เขียนกลับไม่ได้
+Limitation: requires running `sync` to pick up new memory. Agent cannot write back.
 
 ---
 
-### Phase 2 — MCP server (แนะนำ)
+### Phase 2 — MCP server (recommended)
 
-Claude มี tools สำหรับอ่าน/เขียน memory แบบ real-time ระหว่าง session
+Claude gets 5 tools for reading and writing memory in real time during every session.
 
-เพิ่ม `.mcp.json` ที่ root ของโปรเจกต์:
+Add `.mcp.json` to your project root:
 
 ```json
 {
@@ -125,13 +126,13 @@ Claude มี tools สำหรับอ่าน/เขียน memory แบ
 }
 ```
 
-Claude จะมี 5 tools ใหม่: `mem_read`, `mem_write`, `mem_append`, `mem_grep`, `mem_list`
+Claude now has `mem_read`, `mem_write`, `mem_append`, `mem_grep`, and `mem_list` available every session.
 
 ---
 
-### Phase 3 — Hook (zero-effort)
+### Phase 3 — Hook (zero effort)
 
-Memory inject เข้า session อัตโนมัติทุกครั้งที่เปิด Claude Code ไม่ต้องสั่ง command ใดๆ
+Memory is injected automatically at session start. No commands, no prompting.
 
 ```bash
 cp -r examples/phase3-hook/.claude .claude
@@ -140,56 +141,56 @@ export EDGEMEM_CONTAINER=myproject-team
 
 ---
 
-## การทำงานร่วมกันในทีม
+## Built for teams
 
-ทุกคนในทีมใช้ container เดียวกัน — คนหนึ่งเขียน convention คนอื่นได้รู้ทันที:
+All developers share the same container. One person writes a convention — everyone's agent knows immediately:
 
 ```bash
-# Dev A — วันจันทร์
-npx edgemem append "memory/conventions.md" "ใช้ server actions สำหรับ mutations ทั้งหมด" --force
+# Developer A — Monday
+npx edgemem append "memory/conventions.md" "Use server actions for all mutations" --force
 
-# Dev B — วันอังคาร, เครื่องคนละเครื่อง
+# Developer B — Tuesday, different machine
 claude
-# → Claude รู้เรื่อง server actions แล้ว ไม่ต้อง sync ไม่ต้อง commit
+# → Claude already knows about server actions. No sync. No commit.
 ```
 
-**onboard dev ใหม่:**
+**Onboarding a new developer:**
 
 ```bash
 git clone your-repo
-export SUPERMEMORY_API_KEY=sm-...   # รับจาก 1Password ของทีม
+export SUPERMEMORY_API_KEY=sm-...   # from team 1Password
 claude
-# → Claude รู้ context ทั้งหมดของโปรเจกต์ตั้งแต่วันแรก
+# → Claude knows the entire project context from day one
 ```
 
 ---
 
 ## Security
 
-### ไฟล์ที่ agent แก้ไม่ได้ (protected)
+### Protected core files
 
-ไฟล์เหล่านี้เขียนได้เฉพาะมนุษย์ที่ใส่ `--force`:
+These files are read-only for the agent. Only a human can write to them with `--force`:
 
-| ไฟล์ | เก็บอะไร |
+| File | Purpose |
 |------|---------|
-| `memory/stack.md` | tech stack และ versions |
-| `memory/conventions.md` | coding conventions |
-| `memory/decisions.md` | architecture decisions |
-| `memory/onboarding.md` | คู่มือ dev ใหม่ |
+| `memory/stack.md` | Tech stack and versions |
+| `memory/conventions.md` | Coding conventions |
+| `memory/decisions.md` | Architecture decisions |
+| `memory/onboarding.md` | New developer guide |
 
 ```bash
-# มนุษย์เท่านั้น
+# Human override
 npx edgemem write "memory/stack.md" "updated stack" --force
 
-# agent พยายามเขียน → error ทันที ก่อนส่ง API
+# Agent attempt → error before any API call is made
 ```
 
 ### PII scanner
 
-ทุก `write` และ `append` สแกนหา credentials อัตโนมัติก่อนส่ง cloud:
+Every `write` and `append` scans for credentials and redacts them before reaching the cloud:
 
-| Pattern | ถูก redact เป็น |
-|---------|----------------|
+| Pattern | Redacted as |
+|---------|-------------|
 | `sk_live_*`, `sk_test_*` | `[REDACTED_SECRET]` |
 | `AIzaSy*` | `[REDACTED_SECRET]` |
 | `AKIA*` | `[REDACTED_SECRET]` |
@@ -200,47 +201,47 @@ npx edgemem write "memory/stack.md" "updated stack" --force
 
 ### Write signatures
 
-ทุก write มี stamp บอกว่าใครเขียนเมื่อไร:
+Every write is stamped with author and timestamp:
 
 ```
 <!-- edgemem-entry-start | author: alice | timestamp: 2026-06-08T10:33:10Z -->
-ใช้ Drizzle ORM. Run migrations ด้วย pnpm db:migrate
+Use Drizzle ORM. Run migrations with pnpm db:migrate.
 <!-- edgemem-entry-end -->
 ```
 
-`author` มาจาก env var `EDGEMEM_AUTHOR` หรือ `$USER`
+Author is resolved from `EDGEMEM_AUTHOR` env var, falling back to `$USER`.
 
 ---
 
-## Offline mode
+## Offline resilience
 
-ถ้า Supermemory ใช้งานไม่ได้ edgemem ใช้ local cache แทน — Claude Code ไม่ crash:
+If Supermemory is unreachable, edgemem falls back to local cache — Claude Code never crashes:
 
-| Operation | เกิดอะไร |
-|-----------|---------|
-| `read` | คืน cache ล่าสุด + แจ้งเตือน |
-| `write` / `append` | บันทึกลง cache local + แจ้งเตือน |
-| `grep` | คืน empty string + แจ้งเตือน |
-| `list` | คืน empty array |
+| Operation | Behavior |
+|-----------|----------|
+| `read` | Returns latest cached version + warns to stderr |
+| `write` / `append` | Writes to local cache + warns to stderr |
+| `grep` | Returns empty string + warns to stderr |
+| `list` | Returns empty array |
 
-Cache เก็บที่ `~/.edgemem/cache/<container>/`
+Cache lives at `~/.edgemem/cache/<container>/`.
 
 ---
 
-## Smart chunking
+## Smart context chunking
 
-`mem_grep` ทำ semantic search แล้ว **ตัดเฉพาะ section ที่เกี่ยวข้อง** ก่อนส่งให้ Claude — ป้องกัน context window เต็ม:
+`mem_grep` runs a semantic search then **returns only the relevant sections** — so a large memory file never floods the context window:
 
-1. แบ่ง document เป็น section ตาม heading/paragraph
-2. score แต่ละ section (heading match = 3×)
-3. คืน top sections ภายใน budget 4,000 tokens
-4. แจ้งเตือนถ้ามี section ถูกตัดออก
+1. Splits document into sections by heading or paragraph
+2. Scores each section by query relevance (heading match = 3×)
+3. Returns top sections within a 4,000-token budget
+4. Prepends a warning when sections are dropped
 
 ---
 
 ## Audit log
 
-ทุก operation บันทึกลง `.claude/memory/edgemem.log` ในรูป JSON Lines:
+Every operation is appended to `.claude/memory/edgemem.log` in JSON Lines format:
 
 ```jsonl
 {"timestamp":"2026-06-08T10:33:10Z","action":"read","file_path":"memory/stack.md","status":"ok","author":"alice"}
@@ -256,35 +257,35 @@ Cache เก็บที่ `~/.edgemem/cache/<container>/`
 # Setup
 npx edgemem init [--container <name>] [--api-key-env <name>]
 
-# Phase 1 — ดึง memory มาเป็นไฟล์ local
+# Phase 1 — pull memory to local files
 npx edgemem sync [--output <dir>] [--container <name>]
 
-# อ่าน / เขียน
+# Read / write
 npx edgemem read <path> [--container <name>]
 npx edgemem write <path> <content> [--container <name>] [--force]
 npx edgemem append <path> <content> [--container <name>] [--force]
 
-# ค้นหา
+# Search
 npx edgemem grep <query> [--path <path>] [--container <name>]
 npx edgemem list [--path <path>] [--container <name>]
 
-# Phase 3 — inject memory context สำหรับ hook
+# Phase 3 — output memory context for hook injection
 npx edgemem inject [--container <name>] [--format context|json]
 ```
 
-`--force` = bypass write protection บนไฟล์ protected (สำหรับมนุษย์เท่านั้น)
+`--force` bypasses write protection on core files. Intended for human use only.
 
 ---
 
 ## MCP tools
 
-| Tool | ทำอะไร | เขียน protected files ได้? |
-|------|--------|--------------------------|
-| `mem_read` | อ่านไฟล์จาก memory | อ่านอย่างเดียว |
-| `mem_write` | เขียน/overwrite ไฟล์ | ต้องตั้ง `EDGEMEM_ALLOW_CORE_MUTATION=true` |
-| `mem_append` | เพิ่มเนื้อหาต่อท้ายไฟล์ | ต้องตั้ง `EDGEMEM_ALLOW_CORE_MUTATION=true` |
-| `mem_grep` | semantic search + chunked result | อ่านอย่างเดียว |
-| `mem_list` | แสดงรายการไฟล์ทั้งหมด | อ่านอย่างเดียว |
+| Tool | Description | Core-file safe? |
+|------|-------------|----------------|
+| `mem_read` | Read a file from team memory | Read-only |
+| `mem_write` | Write or overwrite a memory file | Requires `EDGEMEM_ALLOW_CORE_MUTATION=true` |
+| `mem_append` | Append to a memory file | Requires `EDGEMEM_ALLOW_CORE_MUTATION=true` |
+| `mem_grep` | Semantic search with chunked results | Read-only |
+| `mem_list` | List all memory files | Read-only |
 
 ---
 
@@ -292,29 +293,29 @@ npx edgemem inject [--container <name>] [--format context|json]
 
 ```
 memory/stack.md        — tech stack, versions, tools           [protected]
-memory/conventions.md  — coding conventions                    [protected]
-memory/decisions.md    — architecture decisions                 [protected]
-memory/onboarding.md   — คู่มือ dev ใหม่                       [protected]
-memory/auto-saved.md   — convention ที่ agent บันทึกเอง        [writable]
-memory/<anything>.md   — ไฟล์ custom ของทีม                    [writable]
+memory/conventions.md  — coding conventions and patterns       [protected]
+memory/decisions.md    — architecture decisions and rationale  [protected]
+memory/onboarding.md   — guide for new developers              [protected]
+memory/auto-saved.md   — conventions captured automatically    [writable]
+memory/<anything>.md   — your own custom files                 [writable]
 ```
 
 ---
 
 ## Configuration
 
-Config resolve ตามลำดับนี้ (ใช้อันแรกที่พบ):
+Config is resolved in this order (first match wins):
 
 1. Environment variables
-2. `.clauderc` ที่ project root
+2. `.clauderc` in the project root
 3. `~/.edgemem/config.json` (global default)
 
-| Variable | ใช้ทำอะไร |
-|----------|----------|
-| `SUPERMEMORY_API_KEY` | API key สำหรับ Supermemory |
-| `EDGEMEM_CONTAINER` | ชื่อ container ที่ทีมใช้ร่วมกัน |
-| `EDGEMEM_AUTHOR` | ชื่อที่ stamp บน write (fallback: `$USER`) |
-| `EDGEMEM_ALLOW_CORE_MUTATION` | ตั้งเป็น `true` เพื่อให้ agent เขียน protected files ได้ |
+| Variable | Purpose |
+|----------|---------|
+| `SUPERMEMORY_API_KEY` | API key for Supermemory |
+| `EDGEMEM_CONTAINER` | Container name shared by the team |
+| `EDGEMEM_AUTHOR` | Identity stamped on every write (falls back to `$USER`) |
+| `EDGEMEM_ALLOW_CORE_MUTATION` | Set to `true` to allow agent writes to protected files |
 
 **.clauderc:**
 
@@ -331,11 +332,11 @@ Config resolve ตามลำดับนี้ (ใช้อันแรกท
 
 ```bash
 pnpm install
-pnpm build   # compile ทุก package
-pnpm test    # run ทั้งหมด 167 tests
+pnpm build   # compile all packages
+pnpm test    # run all 167 tests
 ```
 
-### โครงสร้าง packages
+### Package structure
 
 ```
 packages/
@@ -343,7 +344,7 @@ packages/
   mcp/    @edgemem/mcp  — MCP server (5 tools)
   cli/    edgemem       — CLI (init, sync, read, write, append, grep, list, inject)
 examples/
-  phase1-claudemd/   ตัวอย่าง file sync
+  phase1-claudemd/   file sync example
   phase2-mcp/        .mcp.json + CLAUDE.md instructions
   phase3-hook/       .claude/settings.json + auto-save hook
 ```
