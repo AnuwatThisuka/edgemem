@@ -1,0 +1,23 @@
+{
+  "name": "@edgemem/mcp",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "@edgemem/mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@edgemem/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^5",
+    "vitest": "^2"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "edgemem",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "edgemem": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@edgemem/core": "workspace:*",
+    "commander": "^12"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "typescript": "^5",
+    "vitest": "^2"
+  }
+}

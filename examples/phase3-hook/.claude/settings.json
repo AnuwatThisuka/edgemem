@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx edgemem inject --container ${EDGEMEM_CONTAINER} --format context",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-save.sh",
+            "timeout": 3000
+          }
+        ]
+      }
+    ]
+  }
+}

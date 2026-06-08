@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Config with secrets
+.clauderc
+
+# Synced memory files (generated, not source-controlled)
+.claude/memory/
+!.claude/memory/.gitkeep
+
+# Lock files (keep pnpm-lock.yaml)
+package-lock.json
+yarn.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+coverage/

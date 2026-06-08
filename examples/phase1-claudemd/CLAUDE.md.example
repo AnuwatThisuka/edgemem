@@ -1,0 +1,6 @@
+# Project Memory (auto-synced from edgemem)
+<!-- Run: npx edgemem sync before each session -->
+
+@.claude/memory/stack.md
+@.claude/memory/conventions.md
+@.claude/memory/decisions.md

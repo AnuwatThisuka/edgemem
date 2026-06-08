@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "edgemem": {
+      "command": "npx",
+      "args": ["@edgemem/mcp"],
+      "env": {
+        "SUPERMEMORY_API_KEY": "${SUPERMEMORY_API_KEY}",
+        "EDGEMEM_CONTAINER": "myproject-team"
+      }
+    }
+  }
+}

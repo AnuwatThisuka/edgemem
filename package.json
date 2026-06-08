@@ -1,0 +1,11 @@
+{
+  "name": "edgemem",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "dev": "pnpm -r --parallel dev"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
