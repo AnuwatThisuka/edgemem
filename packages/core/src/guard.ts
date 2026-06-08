@@ -63,7 +63,7 @@ export function scanPii(content: string): PiiScanResult {
     const matches = clean.match(new RegExp(pattern.source, pattern.flags))
     if (matches) {
       redacted.push(...matches.map(() => label))
-      clean = clean.replace(new RegExp(pattern.source, pattern.flags), `[REDACTED:${label}]`)
+      clean = clean.replace(new RegExp(pattern.source, pattern.flags), "[REDACTED_SECRET]")
     }
   }
 

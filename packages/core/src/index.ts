@@ -1,7 +1,6 @@
 import { createBash } from "@supermemory/bash"
 import fs from "node:fs/promises"
 import path from "node:path"
-import { randomUUID } from "node:crypto"
 import { assertWritable, scanPii } from "./guard.js"
 import { writeCache, readCache, appendCache } from "./cache.js"
 import { appendAuditLog, type AuditStatus } from "./audit.js"
@@ -35,8 +34,11 @@ export interface MemConfig {
 export interface MemOptions {
   /** Allow writes to PROTECTED_PATHS. Defaults to EDGEMEM_ALLOW_CORE_MUTATION env var. */
   allowCoreMutation?: boolean
-  /** Stable identifier stamped on every write. Auto-generated if omitted. */
-  sessionId?: string
+  /**
+   * Author identity stamped on every write entry.
+   * Resolved in order: this option → EDGEMEM_AUTHOR env var → USER env var → "unknown".
+   */
+  author?: string
 }
 
 export interface MemClient {
@@ -68,6 +70,10 @@ function warn(msg: string): void {
   process.stderr.write(`[edgemem] ${msg}\n`)
 }
 
+function warnOffline(): void {
+  process.stderr.write("[WARNING: Offline Mode - Serving cached memory]\n")
+}
+
 function auditStatus(ok: boolean, hadPii: boolean): AuditStatus {
   if (!ok) return "error"
   if (hadPii) return "pii-redacted"
@@ -85,13 +91,24 @@ export async function createMem(
     containerTag: config.container,
   })
 
-  const sessionId = options.sessionId ?? randomUUID().slice(0, 8)
+  const author =
+    options.author ??
+    process.env["EDGEMEM_AUTHOR"] ??
+    process.env["USER"] ??
+    "unknown"
+
   const allowCoreMutation =
     options.allowCoreMutation ??
     process.env["EDGEMEM_ALLOW_CORE_MUTATION"] === "true"
 
-  const stamp = (): string =>
-    `\n<!-- edgemem: ${new Date().toISOString()} | session: ${sessionId} -->`
+  function stamp(content: string): string {
+    const ts = new Date().toISOString()
+    return (
+      `<!-- edgemem-entry-start | author: ${author} | timestamp: ${ts} -->\n` +
+      content +
+      `\n<!-- edgemem-entry-end -->`
+    )
+  }
 
   const mem: MemClient = {
     // ── read ────────────────────────────────────────────────────────────────
@@ -112,7 +129,7 @@ export async function createMem(
       // API unreachable — serve from cache
       const cached = await readCache(config.container, filePath)
       if (cached !== undefined) {
-        warn(`offline — serving '${filePath}' from local cache`)
+        warnOffline()
         await appendAuditLog({
           timestamp: new Date().toISOString(),
           action: "read",
@@ -122,7 +139,7 @@ export async function createMem(
         return cached
       }
 
-      warn(`offline — '${filePath}' not in cache, returning empty`)
+      warnOffline()
       await appendAuditLog({
         timestamp: new Date().toISOString(),
         action: "read",
@@ -141,7 +158,7 @@ export async function createMem(
       const hadPii = redacted.length > 0
       if (hadPii) warn(`PII redacted in '${filePath}': ${[...new Set(redacted)].join(", ")}`)
 
-      const stamped = clean + stamp()
+      const stamped = stamp(clean)
 
       const dir = path.dirname(filePath)
       if (dir !== ".") await tryBash(instance, `mkdir -p ${shellEscape(dir)}`)
@@ -161,6 +178,7 @@ export async function createMem(
         action: "write",
         file_path: filePath,
         status: auditStatus(ok, hadPii),
+        author,
         ...(hadPii ? { detail: `redacted: ${[...new Set(redacted)].join(", ")}` } : {}),
       })
     },
@@ -173,7 +191,7 @@ export async function createMem(
       const hadPii = redacted.length > 0
       if (hadPii) warn(`PII redacted in '${filePath}': ${[...new Set(redacted)].join(", ")}`)
 
-      const stamped = clean + stamp()
+      const stamped = stamp(clean)
 
       const dir = path.dirname(filePath)
       if (dir !== ".") await tryBash(instance, `mkdir -p ${shellEscape(dir)}`)
@@ -193,6 +211,7 @@ export async function createMem(
         action: "append",
         file_path: filePath,
         status: auditStatus(ok, hadPii),
+        author,
         ...(hadPii ? { detail: `redacted: ${[...new Set(redacted)].join(", ")}` } : {}),
       })
     },
@@ -212,7 +231,7 @@ export async function createMem(
       })
 
       if (!ok) {
-        warn("offline — grep unavailable")
+        warnOffline()
         return ""
       }
 

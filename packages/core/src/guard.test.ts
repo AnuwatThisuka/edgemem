@@ -120,7 +120,7 @@ describe("scanPii — credential patterns", () => {
     const key = ["sk", "live", "a".repeat(24)].join("_")
     const { clean, redacted } = scanPii(`API key: ${key}`)
     expect(clean).not.toMatch(/sk_live_/)
-    expect(clean).toContain("[REDACTED:stripe-live-key]")
+    expect(clean).toContain("[REDACTED_SECRET]")
     expect(redacted).toContain("stripe-live-key")
   })
 

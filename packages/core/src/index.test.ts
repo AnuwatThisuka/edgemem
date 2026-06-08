@@ -106,7 +106,7 @@ describe("MemClient.read — offline fallback", () => {
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true)
     const mem = await createMem(CONFIG)
     await mem.read("memory/stack.md")
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("offline"))
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("Offline Mode"))
   })
 
   it("logs audit status 'cache-hit' when served from cache", async () => {
@@ -180,7 +180,7 @@ describe("MemClient.write — PII scanning", () => {
     const [, , cachedContent] =
       mockWriteCache.mock.calls.find((c) => c[1] === "memory/auto-saved.md") ?? []
     expect(String(cachedContent)).not.toContain("hunter2")
-    expect(String(cachedContent)).toContain("[REDACTED:")
+    expect(String(cachedContent)).toContain("[REDACTED_SECRET]")
   })
 
   it("logs audit status 'pii-redacted' when PII is detected", async () => {
@@ -208,25 +208,27 @@ describe("MemClient.write — write signature", () => {
     makeOnline()
   })
 
-  it("appends an edgemem HTML comment to the exec command payload", async () => {
+  it("wraps the exec payload in edgemem-entry-start/end markers", async () => {
     const mem = await createMem(CONFIG)
     await mem.write("memory/auto-saved.md", "clean content")
     const execArg = String(
       mockExec.mock.calls.find((c) => String(c[0]).includes("cat >"))?.[0] ?? ""
     )
-    expect(execArg).toContain("<!-- edgemem:")
-    expect(execArg).toContain("session:")
+    expect(execArg).toContain("<!-- edgemem-entry-start")
+    expect(execArg).toContain("author:")
+    expect(execArg).toContain("timestamp:")
+    expect(execArg).toContain("<!-- edgemem-entry-end -->")
   })
 
-  it("uses the caller-supplied sessionId in every stamp", async () => {
-    const mem = await createMem(CONFIG, { sessionId: "abc-123" })
+  it("stamps the caller-supplied author identity into every entry block", async () => {
+    const mem = await createMem(CONFIG, { author: "alice" })
     await mem.write("memory/auto-saved.md", "first")
     await mem.write("memory/auto-saved.md", "second")
     const calls = mockExec.mock.calls
       .filter((c) => String(c[0]).includes("cat >"))
       .map((c) => String(c[0]))
-    expect(calls[0]).toContain("abc-123")
-    expect(calls[1]).toContain("abc-123")
+    expect(calls[0]).toContain("author: alice")
+    expect(calls[1]).toContain("author: alice")
   })
 })
 
@@ -276,7 +278,7 @@ describe("MemClient.grep", () => {
     const mem = await createMem(CONFIG)
     const result = await mem.grep("database")
     expect(result).toBe("")
-    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("offline"))
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("Offline Mode"))
     stderrSpy.mockRestore()
   })
 })

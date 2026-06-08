@@ -9,6 +9,7 @@ export interface AuditEntry {
   action: AuditAction
   file_path: string
   status: AuditStatus
+  author?: string
   detail?: string
 }
 
