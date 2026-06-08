@@ -105,10 +105,17 @@ describe("appendAuditLog", () => {
   // ── Fail-silent guarantee ─────────────────────────────────────────────────
 
   it("never throws when the log directory is not writable", async () => {
-    setAuditLogPath("/proc/no-permission-here/edgemem.log")
-    await expect(
-      appendAuditLog({ timestamp: "t", action: "read", file_path: "x.md", status: "error" })
-    ).resolves.toBeUndefined()
+    const lockedDir = path.join(tmpDir, "locked")
+    await fs.mkdir(lockedDir)
+    await fs.chmod(lockedDir, 0o000)
+    setAuditLogPath(path.join(lockedDir, "edgemem.log"))
+    try {
+      await expect(
+        appendAuditLog({ timestamp: "t", action: "read", file_path: "x.md", status: "error" })
+      ).resolves.toBeUndefined()
+    } finally {
+      await fs.chmod(lockedDir, 0o755)
+    }
   })
 
   it("creates intermediate log directories automatically", async () => {
