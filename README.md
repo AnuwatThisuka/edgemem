@@ -49,7 +49,7 @@ Memory lives in the cloud. Every developer shares it. No commits required.
 |                   | Phase 1 · File sync                      | Phase 2 · MCP             | Phase 3 · Hook               |
 | ----------------- | ---------------------------------------- | ------------------------- | ---------------------------- |
 | How               | `edgemem sync` → local files → `@import` | Live tools in Claude Code | Auto-inject on every session |
-| Agent writes back | ❌                                        | ✅                         | ✅                            |
+| Agent writes back | ❌                                       | ✅                        | ✅                           |
 | Setup effort      | Low                                      | Medium                    | Medium                       |
 | Best for          | Getting started, onboarding              | Active development        | Zero-effort, always-on       |
 
@@ -119,12 +119,12 @@ Every Claude Code session now starts with memory pre-loaded. No commands. No pro
 
 The following memory files are **read-only by default**. The agent cannot overwrite them — only a human can, with an explicit override:
 
-| File | Purpose |
-|------|---------|
-| `memory/stack.md` | Tech stack and versions |
-| `memory/conventions.md` | Coding conventions |
-| `memory/decisions.md` | Architecture decisions |
-| `memory/onboarding.md` | New developer guide |
+| File                    | Purpose                 |
+| ----------------------- | ----------------------- |
+| `memory/stack.md`       | Tech stack and versions |
+| `memory/conventions.md` | Coding conventions      |
+| `memory/decisions.md`   | Architecture decisions  |
+| `memory/onboarding.md`  | New developer guide     |
 
 **To allow human-initiated mutations:**
 
@@ -142,16 +142,16 @@ Any attempt by the agent to write to these files without the override is rejecte
 
 Every `write` and `append` operation automatically scans content and redacts high-probability credentials before they reach Supermemory:
 
-| Pattern | Label |
-|---------|-------|
-| `sk_live_*` / `sk_test_*` | Stripe API keys |
-| `AIzaSy*` | Google Cloud / Firebase API keys |
-| `AKIA*` | AWS Access Key IDs |
-| `ghp_*` / `gho_*` / `ghs_*` | GitHub tokens |
-| `xoxb-*` | Slack bot tokens |
-| `Bearer <token>` | Generic bearer tokens |
-| `password: <value>` | Password literals |
-| `secret: <value>` | Secret literals |
+| Pattern                     | Label                            |
+| --------------------------- | -------------------------------- |
+| `sk_live_*` / `sk_test_*`   | Stripe API keys                  |
+| `AIzaSy*`                   | Google Cloud / Firebase API keys |
+| `AKIA*`                     | AWS Access Key IDs               |
+| `ghp_*` / `gho_*` / `ghs_*` | GitHub tokens                    |
+| `xoxb-*`                    | Slack bot tokens                 |
+| `Bearer <token>`            | Generic bearer tokens            |
+| `password: <value>`         | Password literals                |
+| `secret: <value>`           | Secret literals                  |
 
 Redacted content is stored as `[REDACTED:label]`. The audit log records which labels were stripped.
 
@@ -184,9 +184,9 @@ Every operation is appended to `.claude/memory/edgemem.log` in [JSON Lines](http
 {"timestamp":"2026-06-08T10:33:12Z","action":"read","file_path":"memory/stack.md","status":"cache-hit"}
 ```
 
-| Field | Values |
-|-------|--------|
-| `action` | `read` · `write` · `append` · `grep` · `list` · `export` |
+| Field    | Values                                                      |
+| -------- | ----------------------------------------------------------- |
+| `action` | `read` · `write` · `append` · `grep` · `list` · `export`    |
 | `status` | `ok` · `error` · `cache-hit` · `pii-redacted` · `protected` |
 | `detail` | Optional — present when status is `pii-redacted` or `error` |
 
@@ -245,13 +245,13 @@ npx edgemem inject [--container <name>] [--format context|json]
 
 ## MCP tools
 
-| Tool | Description | Protected-path safe? |
-|------|-------------|---------------------|
-| `mem_read` | Read a file from team memory | ✅ (read-only) |
-| `mem_write` | Write or overwrite a memory file | Blocked unless `EDGEMEM_ALLOW_CORE_MUTATION=true` |
-| `mem_append` | Append content to a memory file | Blocked unless `EDGEMEM_ALLOW_CORE_MUTATION=true` |
-| `mem_grep` | Semantic search (returns chunked results) | ✅ (read-only) |
-| `mem_list` | List memory files | ✅ (read-only) |
+| Tool         | Description                               | Protected-path safe?                              |
+| ------------ | ----------------------------------------- | ------------------------------------------------- |
+| `mem_read`   | Read a file from team memory              | ✅ (read-only)                                    |
+| `mem_write`  | Write or overwrite a memory file          | Blocked unless `EDGEMEM_ALLOW_CORE_MUTATION=true` |
+| `mem_append` | Append content to a memory file           | Blocked unless `EDGEMEM_ALLOW_CORE_MUTATION=true` |
+| `mem_grep`   | Semantic search (returns chunked results) | ✅ (read-only)                                    |
+| `mem_list`   | List memory files                         | ✅ (read-only)                                    |
 
 All tools return a text error message (never throw) so Claude Code always gets a usable response.
 
@@ -298,13 +298,46 @@ Protected files require `--force` (CLI) or `EDGEMEM_ALLOW_CORE_MUTATION=true` (M
 
 ## Write signatures
 
-Every `write` and `append` stamps an invisible HTML comment at the end of the content for conflict tracing:
+Every `write` and `append` wraps the content in a pair of HTML comment markers that identify who wrote it and when:
 
 ```
-<!-- edgemem: 2026-06-08T10:33:10.123Z | session: a3f9b2c1 -->
+<!-- edgemem-entry-start | author: alice | timestamp: 2026-06-08T10:33:10.123Z -->
+Use Drizzle ORM. Run migrations with pnpm db:migrate.
+<!-- edgemem-entry-end -->
 ```
 
-The session ID is generated once per `createMem()` call. Passing `sessionId` in `MemOptions` makes it stable across calls (useful for identifying agent sessions in the audit log).
+This makes concurrent writes from multiple developers or agent sessions unambiguous — each entry is a self-contained, attributable block.
+
+### Author resolution
+
+The `author` field is resolved in this order:
+
+| Priority | Source |
+|----------|--------|
+| 1 | `author` option passed to `createMem()` |
+| 2 | `EDGEMEM_AUTHOR` environment variable |
+| 3 | `USER` environment variable (Unix username) |
+| 4 | `"unknown"` |
+
+**SDK:**
+
+```typescript
+const mem = await createMem(config, { author: "alice" })
+// → <!-- edgemem-entry-start | author: alice | timestamp: ... -->
+```
+
+**Environment variable (MCP server / CLI):**
+
+```bash
+EDGEMEM_AUTHOR=ci-bot npx @edgemem/mcp
+```
+
+The `author` is also written to the audit log on every `write` and `append` operation, so `.claude/memory/edgemem.log` gives a full attributable history:
+
+```jsonl
+{"timestamp":"2026-06-08T10:33:10Z","action":"write","file_path":"memory/auto-saved.md","status":"ok","author":"alice"}
+{"timestamp":"2026-06-08T10:33:11Z","action":"append","file_path":"memory/auto-saved.md","status":"ok","author":"bob"}
+```
 
 ---
 
@@ -312,15 +345,15 @@ The session ID is generated once per `createMem()` call. Passing `sessionId` in 
 
 Both solve the same problem. They work best together.
 
-|                  | CLAUDE.md        | edgemem                  |
-| ---------------- | ---------------- | ------------------------ |
-| Stored           | Git repo         | Supermemory cloud        |
-| Update           | Commit required  | Write anytime            |
-| Agent can write  | ❌                | ✅                        |
-| Size limit       | Context window   | Load only what's needed  |
-| Search           | Read whole file  | Semantic search          |
-| Per-person notes | ❌ everyone sees  | ✅ separate containers    |
-| Offline access   | ✅ always        | ✅ local cache fallback   |
+|                  | CLAUDE.md        | edgemem                 |
+| ---------------- | ---------------- | ----------------------- |
+| Stored           | Git repo         | Supermemory cloud       |
+| Update           | Commit required  | Write anytime           |
+| Agent can write  | ❌               | ✅                      |
+| Size limit       | Context window   | Load only what's needed |
+| Search           | Read whole file  | Semantic search         |
+| Per-person notes | ❌ everyone sees | ✅ separate containers  |
+| Offline access   | ✅ always        | ✅ local cache fallback |
 
 **Recommended pattern:**
 
@@ -343,9 +376,16 @@ Keep `CLAUDE.md` short and structural. Let edgemem handle living knowledge.
 
 Config is resolved in this order (first match wins):
 
-1. Environment variables: `SUPERMEMORY_API_KEY`, `EDGEMEM_CONTAINER`
+1. Environment variables: `SUPERMEMORY_API_KEY`, `EDGEMEM_CONTAINER`, `EDGEMEM_AUTHOR`
 2. `.clauderc` in the project root
 3. `~/.edgemem/config.json` (global default)
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPERMEMORY_API_KEY` | API key for Supermemory |
+| `EDGEMEM_CONTAINER` | Container name shared by the team |
+| `EDGEMEM_AUTHOR` | Identity stamped on every write entry (falls back to `$USER`) |
+| `EDGEMEM_ALLOW_CORE_MUTATION` | Set to `true` to allow writes to protected core files |
 
 **`.clauderc`:**
 
@@ -390,12 +430,12 @@ examples/
 
 ### Test coverage
 
-| Package | Test files | Tests |
-|---------|-----------|-------|
-| `@edgemem/core` | `guard`, `cache`, `audit`, `chunker`, `index` | 107 |
-| `@edgemem/mcp` | `server` | 30 |
-| `edgemem` CLI | `init`, `sync`, `inject` | 30 |
-| **Total** | **9** | **167** |
+| Package         | Test files                                    | Tests   |
+| --------------- | --------------------------------------------- | ------- |
+| `@edgemem/core` | `guard`, `cache`, `audit`, `chunker`, `index` | 107     |
+| `@edgemem/mcp`  | `server`                                      | 30      |
+| `edgemem` CLI   | `init`, `sync`, `inject`                      | 30      |
+| **Total**       | **9**                                         | **167** |
 
 ---
 
