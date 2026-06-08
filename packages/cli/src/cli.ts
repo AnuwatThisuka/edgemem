@@ -3,7 +3,7 @@ import { Command } from "commander"
 import { init } from "./init.js"
 import { sync } from "./sync.js"
 import { inject } from "./inject.js"
-import { createMem } from "@edgemem/core"
+import { createMem, ProtectedFileError } from "@edgemem/core"
 import { resolveConfig } from "@edgemem/core/config"
 
 const program = new Command()
@@ -11,7 +11,7 @@ const program = new Command()
 program
   .name("edgemem")
   .description("Filesystem-native agent memory layer for Claude Code")
-  .version("0.1.0")
+  .version("0.2.0")
 
 program
   .command("init")
@@ -36,23 +36,55 @@ program
   .command("write <path> <content>")
   .description("Write content to a memory file")
   .option("-c, --container <name>", "Supermemory container name")
-  .action(async (filePath: string, content: string, opts: { container?: string }) => {
-    const config = await resolveConfig({ container: opts.container })
-    const mem = await createMem(config)
-    await mem.write(filePath, content)
-    console.log(`Written to ${filePath}`)
-  })
+  .option(
+    "--force",
+    "Allow writing to protected core files (requires human intent)",
+    false
+  )
+  .action(
+    async (filePath: string, content: string, opts: { container?: string; force: boolean }) => {
+      const config = await resolveConfig({ container: opts.container })
+      const mem = await createMem(config, { allowCoreMutation: opts.force })
+      try {
+        await mem.write(filePath, content)
+        console.log(`Written to ${filePath}`)
+      } catch (err) {
+        if (err instanceof ProtectedFileError) {
+          console.error(err.message)
+          console.error("Tip: use --force to override (human-only action)")
+          process.exit(1)
+        }
+        throw err
+      }
+    }
+  )
 
 program
   .command("append <path> <content>")
   .description("Append content to a memory file")
   .option("-c, --container <name>", "Supermemory container name")
-  .action(async (filePath: string, content: string, opts: { container?: string }) => {
-    const config = await resolveConfig({ container: opts.container })
-    const mem = await createMem(config)
-    await mem.append(filePath, content)
-    console.log(`Appended to ${filePath}`)
-  })
+  .option(
+    "--force",
+    "Allow appending to protected core files (requires human intent)",
+    false
+  )
+  .action(
+    async (filePath: string, content: string, opts: { container?: string; force: boolean }) => {
+      const config = await resolveConfig({ container: opts.container })
+      const mem = await createMem(config, { allowCoreMutation: opts.force })
+      try {
+        await mem.append(filePath, content)
+        console.log(`Appended to ${filePath}`)
+      } catch (err) {
+        if (err instanceof ProtectedFileError) {
+          console.error(err.message)
+          console.error("Tip: use --force to override (human-only action)")
+          process.exit(1)
+        }
+        throw err
+      }
+    }
+  )
 
 program
   .command("read <path>")

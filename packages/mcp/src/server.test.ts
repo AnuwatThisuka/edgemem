@@ -2,89 +2,168 @@ import { describe, it, expect, vi } from "vitest"
 import { createServer } from "./server.js"
 import type { MemClient } from "@edgemem/core"
 
+type McpHandler = (req: unknown) => Promise<unknown>
+type McpHandlers = { _requestHandlers: Map<string, McpHandler> }
+
+function getHandler(server: ReturnType<typeof createServer>, method: string): McpHandler {
+  const handler = (server as unknown as McpHandlers)._requestHandlers.get(method)
+  if (!handler) throw new Error(`No handler for ${method}`)
+  return handler
+}
+
 function mockMem(overrides: Partial<MemClient> = {}): MemClient {
   return {
     read: vi.fn().mockResolvedValue("mock content"),
     write: vi.fn().mockResolvedValue(undefined),
     append: vi.fn().mockResolvedValue(undefined),
-    grep: vi.fn().mockResolvedValue("mock grep result"),
+    grep: vi.fn().mockResolvedValue("## Stack\nNode 20\n\n## Database\nPostgreSQL 16"),
     list: vi.fn().mockResolvedValue(["file1.md", "file2.md"]),
     export: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }
 
-describe("MCP Server tools", () => {
-  it("exposes all 5 tools", async () => {
-    const mem = mockMem()
-    const server = createServer(mem)
+async function callTool(
+  server: ReturnType<typeof createServer>,
+  name: string,
+  args: Record<string, unknown>
+): Promise<{ content: { text: string }[]; isError?: boolean }> {
+  const handler = getHandler(server, "tools/call")
+  return (await handler({
+    method: "tools/call",
+    params: { name, arguments: args },
+  })) as { content: { text: string }[]; isError?: boolean }
+}
 
-    const handler = (server as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
-    })._requestHandlers.get("tools/list")
+// ── Tool listing ─────────────────────────────────────────────────────────────
 
-    expect(handler).toBeDefined()
-    const result = (await handler?.({ method: "tools/list", params: {} })) as {
+describe("MCP Server — tools/list", () => {
+  it("exposes exactly 5 tools", async () => {
+    const server = createServer(mockMem())
+    const handler = getHandler(server, "tools/list")
+    const result = (await handler({ method: "tools/list", params: {} })) as {
       tools: { name: string }[]
     }
     const names = result.tools.map((t) => t.name)
-    expect(names).toContain("mem_read")
-    expect(names).toContain("mem_write")
-    expect(names).toContain("mem_append")
-    expect(names).toContain("mem_grep")
-    expect(names).toContain("mem_list")
+    expect(names).toEqual(
+      expect.arrayContaining(["mem_read", "mem_write", "mem_append", "mem_grep", "mem_list"])
+    )
+    expect(names).toHaveLength(5)
   })
+})
 
-  it("mem_read calls mem.read and returns content", async () => {
+// ── mem_read ─────────────────────────────────────────────────────────────────
+
+describe("mem_read", () => {
+  it("returns file content", async () => {
     const mem = mockMem({ read: vi.fn().mockResolvedValue("stack: node 20") })
     const server = createServer(mem)
-
-    const handler = (server as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
-    })._requestHandlers.get("tools/call")
-
-    const result = (await handler?.({
-      method: "tools/call",
-      params: { name: "mem_read", arguments: { path: "memory/stack.md" } },
-    })) as { content: { text: string }[] }
-
+    const result = await callTool(server, "mem_read", { path: "memory/stack.md" })
     expect(result.content[0]?.text).toBe("stack: node 20")
     expect(mem.read).toHaveBeenCalledWith("memory/stack.md")
   })
 
-  it("mem_write calls mem.write and returns confirmation", async () => {
+  it("returns (empty) when content is empty string", async () => {
+    const mem = mockMem({ read: vi.fn().mockResolvedValue("") })
+    const server = createServer(mem)
+    const result = await callTool(server, "mem_read", { path: "memory/missing.md" })
+    expect(result.content[0]?.text).toBe("(empty)")
+  })
+})
+
+// ── mem_write ─────────────────────────────────────────────────────────────────
+
+describe("mem_write", () => {
+  it("calls mem.write and returns confirmation", async () => {
     const mem = mockMem()
     const server = createServer(mem)
-
-    const handler = (server as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
-    })._requestHandlers.get("tools/call")
-
-    const result = (await handler?.({
-      method: "tools/call",
-      params: {
-        name: "mem_write",
-        arguments: { path: "memory/stack.md", content: "Node 20" },
-      },
-    })) as { content: { text: string }[] }
-
-    expect(result.content[0]?.text).toContain("Written to memory/stack.md")
-    expect(mem.write).toHaveBeenCalledWith("memory/stack.md", "Node 20")
+    const result = await callTool(server, "mem_write", {
+      path: "memory/custom.md",
+      content: "Node 20",
+    })
+    expect(result.content[0]?.text).toContain("Written to memory/custom.md")
+    expect(mem.write).toHaveBeenCalledWith("memory/custom.md", "Node 20")
   })
 
-  it("returns error text when tool throws, not unhandled rejection", async () => {
+  it("rejects writes to protected paths by default", async () => {
+    const mem = mockMem()
+    const server = createServer(mem) // allowCoreMutation defaults to false
+    const result = await callTool(server, "mem_write", {
+      path: "memory/stack.md",
+      content: "overwrite",
+    })
+    expect(result.isError).toBe(true)
+    expect(result.content[0]?.text).toContain("Protected")
+    expect(mem.write).not.toHaveBeenCalled()
+  })
+
+  it("allows writes to protected paths when allowCoreMutation=true", async () => {
+    const mem = mockMem()
+    const server = createServer(mem, { allowCoreMutation: true })
+    const result = await callTool(server, "mem_write", {
+      path: "memory/stack.md",
+      content: "new stack",
+    })
+    expect(result.isError).toBeUndefined()
+    expect(mem.write).toHaveBeenCalledWith("memory/stack.md", "new stack")
+  })
+})
+
+// ── mem_append ────────────────────────────────────────────────────────────────
+
+describe("mem_append", () => {
+  it("appends to non-protected files", async () => {
+    const mem = mockMem()
+    const server = createServer(mem)
+    const result = await callTool(server, "mem_append", {
+      path: "memory/auto-saved.md",
+      content: "new convention",
+    })
+    expect(result.isError).toBeUndefined()
+    expect(mem.append).toHaveBeenCalled()
+  })
+
+  it("rejects append to protected paths", async () => {
+    const mem = mockMem()
+    const server = createServer(mem)
+    const result = await callTool(server, "mem_append", {
+      path: "memory/conventions.md",
+      content: "injected",
+    })
+    expect(result.isError).toBe(true)
+    expect(mem.append).not.toHaveBeenCalled()
+  })
+})
+
+// ── mem_grep ──────────────────────────────────────────────────────────────────
+
+describe("mem_grep", () => {
+  it("returns chunked result, not raw dump", async () => {
+    const mem = mockMem({
+      grep: vi.fn().mockResolvedValue("## Stack\nNode 20\n\n## Database\nPostgreSQL 16"),
+    })
+    const server = createServer(mem)
+    const result = await callTool(server, "mem_grep", { query: "database" })
+    // Should contain the relevant heading
+    expect(result.content[0]?.text).toContain("Database")
+    expect(result.isError).toBeUndefined()
+  })
+
+  it("returns (no results) when grep returns empty", async () => {
+    const mem = mockMem({ grep: vi.fn().mockResolvedValue("") })
+    const server = createServer(mem)
+    const result = await callTool(server, "mem_grep", { query: "missing" })
+    expect(result.content[0]?.text).toBe("(no results)")
+  })
+})
+
+// ── Error handling ────────────────────────────────────────────────────────────
+
+describe("Error handling", () => {
+  it("returns isError=true when a tool throws, not an unhandled rejection", async () => {
     const mem = mockMem({ read: vi.fn().mockRejectedValue(new Error("network error")) })
     const server = createServer(mem)
-
-    const handler = (server as unknown as {
-      _requestHandlers: Map<string, (req: unknown) => Promise<unknown>>
-    })._requestHandlers.get("tools/call")
-
-    const result = (await handler?.({
-      method: "tools/call",
-      params: { name: "mem_read", arguments: { path: "missing.md" } },
-    })) as { content: { text: string }[]; isError: boolean }
-
+    const result = await callTool(server, "mem_read", { path: "broken.md" })
     expect(result.isError).toBe(true)
     expect(result.content[0]?.text).toContain("network error")
   })
